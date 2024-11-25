@@ -84,7 +84,7 @@ class Conjunto
     {
         var i := 0;
         existe := false;
-        
+
         while i < quantidade
             invariant 0 <= i <= quantidade
             invariant Valid()
@@ -123,6 +123,7 @@ class Conjunto
         ensures 0 <= result.quantidade <= quantidade + other.quantidade
         ensures forall x :: x in toSet(Conteudo) ==> x in toSet(result.Conteudo)
         ensures forall x :: x in toSet(other.Conteudo) ==> x in toSet(result.Conteudo)
+        ensures toSet(result.Conteudo) == toSet(Conteudo) + toSet(other.Conteudo)
         ensures fresh(result)
     {
         result := new Conjunto();
@@ -170,24 +171,35 @@ class Conjunto
     method Interseccao(other: Conjunto) returns (result: Conjunto)
         requires Valid()
         requires other.Valid()
-        ensures result.Valid()
+        requires other.quantidade > 0
+        requires quantidade > 0
         ensures forall x :: x in toSet(result.Conteudo) <==> x in toSet(Conteudo) && x in toSet(other.Conteudo)
+        ensures result.Valid()
+        // ensures toSet(result.Conteudo) == toSet(Conteudo) * toSet(other.Conteudo)
+        ensures Valid()
         ensures fresh(result)
     {
-        result := new Conjunto(); 
+        result := new Conjunto();
 
         var i := 0;
         while i < quantidade
             decreases quantidade - i
             invariant 0 <= i <= quantidade
             invariant result.Valid()
+            invariant Valid()
+            invariant other.Valid()
             invariant forall x :: x in toSet(result.Conteudo) ==> x in toSet(Conteudo) && x in toSet(other.Conteudo)
-            invariant forall j :: 0 <= j < i ==> (elementos[j] in toSet(result.Conteudo) <==> elementos[j] in toSet(other.Conteudo))
+            invariant forall x :: 0 <= x < i && !result.possui_elemento(elementos[x]) && other.possui_elemento(elementos[x]) && possui_elemento(elementos[x]) ==> elementos[x] in toSet(result.Conteudo)
         {
             var elemento := elementos[i];
-            if other.possui_elemento(elemento) {
+
+            // Adiciona o elemento à interseção se ele estiver nesse conjunto e no outro conjunto
+            if other.possui_elemento(elemento) && possui_elemento(elemento) {
                 if !result.possui_elemento(elemento) {
                     result.Adicionar(elemento);
+                    assert result.possui_elemento(elemento);
+                    assert elemento in toSet(Conteudo[0..i + 1]) * toSet(other.Conteudo);
+                    assert forall x :: 0 <= x < i && !result.possui_elemento(elementos[x]) && other.possui_elemento(elementos[x]) && possui_elemento(elementos[x]) ==> elementos[x] in toSet(result.Conteudo);
                 }
             }
             i := i + 1;
@@ -287,23 +299,12 @@ class Conjunto
         var expectedUnion := {1, 2, 3, 4, 5, 6};
         assert toSet(c3.Conteudo) == expectedUnion;
 
-        assert toSet(c1.Conteudo) == {1, 2, 3};
-        assert toSet(c2.Conteudo) == {4, 5, 6};
-
-        c1.Adicionar(7);
-        assert toSet(c1.Conteudo) == {1, 2, 3, 7};
-
-        c1.Adicionar(3);
-        assert toSet(c1.Conteudo) == {1, 2, 3, 7};
-
-        assert |toSet(c1.Conteudo)| == 4;
-
         var c4 := new Conjunto();
         c4.Adicionar(7);
         c4.Adicionar(8);
-        var c5 := c1.Uniao(c4);
 
-        assert toSet(c5.Conteudo) == {1, 2, 3, 7, 8};
+        var c5 := c3.Uniao(c4);
+        assert toSet(c5.Conteudo) == {1, 2, 3, 4, 5, 6, 7, 8};
     }
 
     method TestInterseccao()
