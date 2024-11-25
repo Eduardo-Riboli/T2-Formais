@@ -47,6 +47,7 @@ class Conjunto
         ensures old(!possui_elemento(elemento)) <==> quantidade == old(quantidade) + 1
         ensures old(possui_elemento(elemento)) <==> Conteudo == old(Conteudo)
         ensures old(possui_elemento(elemento)) <==> quantidade == old(quantidade)
+        ensures elemento in Conteudo
     {
         if possui_elemento(elemento) {
             // Garante que nada mudou quando o elemento já existe
