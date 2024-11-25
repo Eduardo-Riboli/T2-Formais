@@ -82,7 +82,21 @@ class Conjunto
         ensures existe == (elemento in toSet(Conteudo))
         ensures !existe == !(elemento in toSet(Conteudo))
     {
-        existe := possui_elemento(elemento);
+        var i := 0;
+        existe := false;
+        
+        while i < quantidade
+            invariant 0 <= i <= quantidade
+            invariant Valid()
+            invariant existe == (exists j :: 0 <= j < i && elementos[j] == elemento)
+            decreases quantidade - i
+        {
+            if elementos[i] == elemento {
+                existe := true;
+                break;
+            }
+            i := i + 1;
+        }
     }
 
     method QuantidadeElementos() returns (tamanho: nat)
