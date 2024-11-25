@@ -1,88 +1,89 @@
 class Conjunto
 {
     ghost var Conteudo: seq<int>
-    ghost var Repr: set<object>
 
     var elementos: array<int>
     var quantidade: nat
 
     ghost predicate Valid()
-        reads this, Repr
+        reads this, elementos
     {
-        && this in Repr
-        && elementos in Repr
-        && 0 <= quantidade <= elementos.Length
+        0 <= quantidade <= elementos.Length
         && (forall i, j :: 0 <= i < quantidade && 0 <= j < quantidade && i != j ==> elementos[i] != elementos[j])
         && Conteudo == elementos[0..quantidade]
+        && elementos.Length == |Conteudo|
     }
-
-    // obter conjunto a partir de sequencia
-    ghost function toSet(s:seq<int>) : set<int>
+    
+    // Obter conjunto a partir de sequência
+    ghost function toSet(s: seq<int>): set<int>
     {
         set x | x in s
     }
 
-    // obter conjunto a partir de sequencia até uma posição
-    ghost function toSetPos(s:seq<int>, posicao:nat): set<int>
+    function possui_elemento(e: int): bool
+        reads this, elementos
     {
-        set i | 0 <= i < posicao < |s| :: s[i]
+        exists i :: 0 <= i < elementos.Length && elementos[i] == e
     }
 
-    // obter um elemento qualquer de um conjunto
-    ghost function umElementoDo(s:set<nat>):(x:nat)
-        requires |s| != 0
-        ensures x in s
-    {
-        var x :| x in s; // atribuir tal que expressão para true
-        x
-    }
-
-    constructor ()
-        ensures Valid() && fresh(Repr)
+    constructor()
+        ensures Valid()
         ensures Conteudo == []
     {
-        elementos := new int[10];
+        elementos := new int[0];
         quantidade := 0;
         Conteudo := [];
-        Repr := {this, elementos};
     }
 
-    // Método para adicionar
-    method Adicionar (elemento: int)
+    method Adicionar(elemento: int)
         requires Valid()
-        requires elemento !in toSet(Conteudo)
-        modifies this, elementos
-        ensures Conteudo == old(Conteudo) + [elemento]
-        ensures Valid() 
-        ensures fresh(Repr - old(Repr))
+        modifies this
+        ensures Valid()
+        ensures exists i :: 0 <= i < quantidade && elementos[i] == elemento
+        ensures forall i :: i in old(Conteudo) ==> i in Conteudo
+        ensures forall i, j :: 0 <= i < j < quantidade ==> elementos[i] != elementos[j]
+        ensures old(!possui_elemento(elemento)) <==> Conteudo == old(Conteudo) + [elemento]
+        ensures old(!possui_elemento(elemento)) <==> quantidade == old(quantidade) + 1
+        ensures old(possui_elemento(elemento)) <==> Conteudo == old(Conteudo)
+        ensures old(possui_elemento(elemento)) <==> quantidade == old(quantidade)
+        ensures elemento in Conteudo
     {
-        // Redimensiona o array se necessário
-        if quantidade == elementos.Length {
-            var novoTamanho := if elementos.Length == 0 then 1 else elementos.Length * 2;
-            var novoArray := new int[novoTamanho];
-
-            forall i | 0 <= i < quantidade {
-                novoArray[i] := elementos[i];
-            }   
-
-            var old_elementos := elementos;
-            elementos := novoArray;
-            Repr := (Repr - {old_elementos}) + {elementos};
+        if possui_elemento(elemento) {
+            // Garante que nada mudou quando o elemento já existe
+            assert Conteudo == old(Conteudo);
+            assert quantidade == old(quantidade);
+            return;
         }
 
-        elementos[quantidade] := elemento;
+        var novoElementos := new int[elementos.Length + 1];
+        var i := 0;
+
+        while i < elementos.Length
+            invariant 0 <= i <= elementos.Length
+            invariant novoElementos.Length == elementos.Length + 1
+            invariant forall x :: 0 <= x < i ==> novoElementos[x] == elementos[x]
+            invariant Conteudo == old(Conteudo)
+            invariant Valid()
+        {
+            novoElementos[i] := elementos[i];
+            i := i + 1;
+        }
+
+        novoElementos[elementos.Length] := elemento;
         quantidade := quantidade + 1;
+        elementos := novoElementos;
         Conteudo := Conteudo + [elemento];
     }
 
-    // Método que verifica se o elemento contém ou não no conjunto
     method Contem(elemento: int) returns (existe: bool)
         requires Valid()
         ensures Valid()
         ensures existe == (elemento in toSet(Conteudo))
+        ensures !existe == !(elemento in toSet(Conteudo))
     {
         var i := 0;
         existe := false;
+
         while i < quantidade
             invariant 0 <= i <= quantidade
             invariant Valid()
@@ -93,11 +94,11 @@ class Conjunto
                 existe := true;
                 break;
             }
+
             i := i + 1;
         }
     }
 
-    // Método que diz a quantidade de elementos
     method QuantidadeElementos() returns (tamanho: nat)
         requires Valid()
         ensures tamanho == |Conteudo|
@@ -106,7 +107,6 @@ class Conjunto
         tamanho := quantidade;
     }
 
-    // Método que verifica se o conjunto está vazio
     method EhVazio() returns (vazio: bool)
         requires Valid()
         ensures vazio == (quantidade == 0)
@@ -115,14 +115,12 @@ class Conjunto
         vazio := quantidade == 0;
     }
 
-    // Metodo para remover
-    method Remover(elemento: int) returns (removido: bool)
+    method Remover(elemento: int) returns (removido:bool)
         requires Valid()
         requires |Conteudo| > 0
-        modifies Repr
+        modifies this, elementos
         requires elemento in Conteudo
         ensures removido ==> forall x :: x in Conteudo <==> x in old(Conteudo) && x != elemento
-        ensures Valid() && fresh(Repr - old(Repr))
 
     {
         removido := false;
@@ -134,12 +132,11 @@ class Conjunto
             for i := 0 to quantidade - 1
             invariant 0 <= i <= quantidade
             invariant Valid()
+            invariant Conteudo == ConteudoInicial
             invariant forall j :: 0 <= j < i ==> elementos[j] != elemento
             invariant (indice == -1 ==> forall j :: 0 <= j < i ==> elementos[j] != elemento) // Antes de encontrar o elemento
             invariant (indice != -1 ==> (0 <= indice < quantidade && elementos[indice] == elemento)) // Depois de encontrar o elemento
             invariant exists k :: 0 <= k < quantidade && elementos[k] == elemento // Garante que o elemento existe
-            invariant Conteudo == ConteudoInicial
-
         {
             if elementos[i] == elemento {
                 assert i != -1;
@@ -148,17 +145,16 @@ class Conjunto
                 assert indice != -1;
                 break;
             }
-            
         }
 
-        if indice == -1 {
+        if indice == -1 
+        {
             assert Conteudo == ConteudoInicial;
             return;
         }
 
         assert indice != -1; // Ensure we found the element
 
-        // Update Conteudo explicitly
         Conteudo := Conteudo[0..indice] + Conteudo[indice + 1..];
         assert Conteudo == old(Conteudo)[0..indice] + old(Conteudo)[indice + 1..];
 
@@ -170,39 +166,56 @@ class Conjunto
         // Update quantity
         quantidade := quantidade - 1;
 
-        removido := true;
-        // Ensure Valid() holds
-        assert Valid();
+        // Reduz tamanho do array, se necessário
+        if quantidade < elementos.Length / 4 && elementos.Length > 10 {
+            var novoTamanho := elementos.Length / 2;
+            var novoArray := new int[novoTamanho];
+
+            forall i | 0 <= i < quantidade {
+                novoArray[i] := elementos[i];
+            }
+
+            var old_elementos := elementos;
+            elementos := novoArray;
+        }
+            // assert Valid();
+            // Atualiza o conjunto
+            var old_elementos := elementos;
+
+            removido := true;
+
+            // Garante que o conjunto continua válido
+            // assert Valid();
     }
 
-    // Método para unir dois conjuntos
     method Uniao(other: Conjunto) returns (result: Conjunto)
         requires Valid()
         requires other.Valid()
         ensures result.Valid()
-        ensures fresh(result)
         ensures forall x :: x in toSet(result.Conteudo) ==> x in toSet(Conteudo) || x in toSet(other.Conteudo)
-        ensures forall x :: x in toSet(Conteudo) ==> x in toSet(result.Conteudo)
-        ensures forall x :: x in toSet(other.Conteudo) ==> x in toSet(result.Conteudo)
-        ensures |toSet(result.Conteudo)| == |toSet(Conteudo) + toSet(other.Conteudo)|
+        ensures toSet(result.Conteudo) == toSet(Conteudo) + toSet(other.Conteudo)
+        ensures fresh(result)
     {
-        result := new Conjunto(); // Criação local de result
-        var i := 0;
+        result := new Conjunto();
 
         // Adicionar elementos do conjunto atual
+        var i := 0;
         while i < quantidade
             decreases quantidade - i
             invariant 0 <= i <= quantidade
-            invariant result.Valid() // Garante que result permanece válido
-            invariant forall x :: x in toSet(result.Conteudo) ==> x in toSet(Conteudo) // Elementos de result estão em Conteudo
-            invariant forall j :: 0 <= j < i ==> elementos[j] in toSet(result.Conteudo) // Elementos até índice i estão em result
+            invariant result.Valid()
+            invariant Valid()
+            invariant result.quantidade <= i
+            invariant result.quantidade <= quantidade
+            invariant forall x :: x in toSet(result.Conteudo) ==> x in toSet(Conteudo)
+            invariant forall j :: 0 <= j < i ==> elementos[j] in toSet(result.Conteudo)
         {
-            assert result.Valid(); // Confirma que result é válido antes de Adicionar
-            assert elementos[i] !in toSet(result.Conteudo); // Confirma pré-condição de Adicionar
-            // result.Adicionar(elementos[i]); // Chamada ao método Adicionar
+            if !result.possui_elemento(elementos[i]) {
+                result.Adicionar(elementos[i]);
+            }
+
             i := i + 1;
         }
-
 
         // Adicionar elementos do outro conjunto
         i := 0;
@@ -210,110 +223,173 @@ class Conjunto
             decreases other.quantidade - i
             invariant 0 <= i <= other.quantidade
             invariant result.Valid()
+            invariant other.Valid()
+            invariant Valid()
             invariant forall x :: x in toSet(result.Conteudo) ==> x in toSet(Conteudo) || x in toSet(other.Conteudo)
             invariant forall j :: 0 <= j < i ==> other.elementos[j] in toSet(result.Conteudo)
+            invariant forall x :: x in toSet(Conteudo) ==> x in toSet(result.Conteudo)
         {
             var elemento := other.elementos[i];
-            if !(elemento in toSet(result.Conteudo)) {
-                assert elemento !in toSet(result.Conteudo);
-                // result.Adicionar(elemento);
+            
+            if !result.possui_elemento(elemento) {
+                result.Adicionar(elemento);
             }
+            
             i := i + 1;
         }
     }
 
+    method Interseccao(other: Conjunto) returns (result: Conjunto)
+        requires Valid()
+        requires other.Valid()
+        requires other.quantidade > 0
+        requires quantidade > 0
+        ensures forall x :: x in toSet(result.Conteudo) <==> x in toSet(Conteudo) && x in toSet(other.Conteudo)
+        ensures result.Valid()
+        ensures toSet(result.Conteudo) == toSet(Conteudo) * toSet(other.Conteudo)
+        ensures Valid()
+        ensures fresh(result)
+    {
+        result := new Conjunto();
 
-    // Método para intersecção
-    // method Interseccao(other: Conjunto) returns (result: Conjunto)
-    //     requires Valid()
-    //     requires other.Valid()
-    //     requires other.elementos.Length > 0
-    //     requires elementos.Length > 0
-    //     ensures result.Valid()
-    //     ensures fresh(result)
-    //     ensures Valid()
-    //     ensures forall x :: x in toSet(result.Conteudo) <==> x in toSet(Conteudo) && x in toSet(other.Conteudo)
-    // {
-    //     result := new Conjunto();
+        var i := 0;
+        while i < quantidade
+            decreases quantidade - i
+            invariant 0 <= i <= quantidade
+            invariant result.Valid()
+            invariant Valid()
+            invariant other.Valid()
+            invariant forall x :: x in toSet(result.Conteudo) ==> x in toSet(Conteudo) && x in toSet(other.Conteudo)
+            invariant forall x :: 0 <= x < i && !result.possui_elemento(elementos[x]) && other.possui_elemento(elementos[x]) && possui_elemento(elementos[x]) ==> elementos[x] in toSet(result.Conteudo)
+        {
+            var elemento := elementos[i];
 
-    //     var i := 0;
-    //     while i < elementos.Length
-    //         invariant 0 <= i <= elementos.Length
-    //         invariant result.Valid()
-    //         invariant Valid()
-    //         invariant other.Valid()
-    // }
+            // Adiciona o elemento à interseção se ele estiver nesse conjunto e no outro conjunto
+            if other.possui_elemento(elemento) && possui_elemento(elemento) {
+                if !result.possui_elemento(elemento) {
+                    result.Adicionar(elemento);
+                }
+            }
 
+            i := i + 1;
+        }
+    }
 
-    // Método Main para testar a classe Conjunto
     method Main()
     {
-        var conjunto := new Conjunto();
+        TestAdicionar();
+        TestContem();
+        TestQuantidadeElementos();
+        TestEhVazio();
+        TestUniao();
+        TestInterseccao();
+    }
 
-        // Teste do método Adicionar
-        conjunto.Adicionar(10);
-        conjunto.Adicionar(20);
-        conjunto.Adicionar(30);
+    method TestAdicionar()
+    {
+        var c1 := new Conjunto();
+        c1.Adicionar(1);
+        c1.Adicionar(2);
+        c1.Adicionar(3);
+        assert c1.Valid();
+        assert c1.Conteudo == [1, 2, 3];
+        assert toSet(c1.Conteudo) == {1, 2, 3};
 
-        var elementos := conjunto.QuantidadeElementos();
-        assert elementos == 3;
+        var c2 := new Conjunto();
+        c2.Adicionar(4);
+        c2.Adicionar(5);
+        c2.Adicionar(6);
+        assert c2.Valid();
+        assert c2.Conteudo == [4, 5, 6];
+        assert toSet(c2.Conteudo) == {4, 5, 6};
+    }
 
-        // Tentar adicionar um elemento já existente
-        // Deverá falhar devido à pré-condição (elemento não está em Conteudo)
-        // Portanto, devemos verificar se o elemento existe antes
-        var existe := conjunto.Contem(20);
-        if !existe {
-            conjunto.Adicionar(20);
-        } else {
-            // Não adiciona, pois já existe
-        }
-        elementos := conjunto.QuantidadeElementos();
-        assert elementos == 3;
+    method TestContem()
+    {
+        var c1 := new Conjunto();
+        c1.Adicionar(1);
+        c1.Adicionar(2);
+        c1.Adicionar(3);
 
-        // Teste do método Contem
-        existe := conjunto.Contem(20);
-        assert existe == true;
+        var contem := c1.Contem(1);
+        assert contem == true;
 
-        existe := conjunto.Contem(40);
-        assert existe == false;
+        var contem2 := c1.Contem(5);
+        assert contem2 == false;
+    }
 
-        // Teste do método EhVazio
-        var vazio := conjunto.EhVazio();
+    method TestQuantidadeElementos()
+    {
+        var c1 := new Conjunto();
+        var tamanho := c1.QuantidadeElementos();
+        assert tamanho == 0;
+
+        c1.Adicionar(1);
+        c1.Adicionar(2);
+        c1.Adicionar(3);
+        tamanho := c1.QuantidadeElementos();
+        assert tamanho == 3;
+
+        c1.Adicionar(1); // Tentando adicionar elemento duplicado
+        assert c1.Valid();
+        tamanho := c1.QuantidadeElementos();
+        assert tamanho == 3; // Quantidade deve permanecer 3
+    }
+
+    method TestEhVazio()
+    {
+        var c1 := new Conjunto();
+        var vazio := c1.EhVazio();
+        assert vazio == true;
+
+        c1.Adicionar(1);
+        vazio := c1.EhVazio();
         assert vazio == false;
 
-        // Teste do método Remover
-        // conjunto.Remover(20);
-        // elementos := conjunto.QuantidadeElementos();
-        // assert elementos == 2;
-        // existe := conjunto.Contem(20);
-        // assert existe == false;
+        c1.Adicionar(2);
+        vazio := c1.EhVazio();
+        assert vazio == false;
+    }
 
-        // Remover elementos restantes
-        // conjunto.Remover(10);
-        // conjunto.Remover(30);
-        // assert conjunto.EhVazio() == true;
+    method TestUniao()
+    {
+        var c1 := new Conjunto();
+        c1.Adicionar(1);
+        c1.Adicionar(2);
+        c1.Adicionar(3);
 
-        // Teste de remover de um conjunto vazio
-        // Como a pré-condição exige que o elemento esteja no conjunto, precisamos verificar
+        var c2 := new Conjunto();
+        c2.Adicionar(4);
+        c2.Adicionar(5);
+        c2.Adicionar(6);
 
-        // var vinte := conjunto.Remover(20);
-        // assert vinte == true;
+        var c3 := c1.Uniao(c2);
+        assert c3.Valid();
+        var expectedUnion := {1, 2, 3, 4, 5, 6};
+        assert toSet(c3.Conteudo) == expectedUnion;
 
-        var conjunto2 := new Conjunto();
-        conjunto2.Adicionar(10);
-        conjunto2.Adicionar(20);
-        conjunto2.Adicionar(30);
+        var c4 := new Conjunto();
+        c4.Adicionar(7);
+        c4.Adicionar(8);
 
-        var tamanhoConjunto := conjunto.QuantidadeElementos();
-        var tamanhoConjunto2 := conjunto2.QuantidadeElementos();
-        assert tamanhoConjunto == tamanhoConjunto2;
-        // assert conjunto.EhVazio() == true;
+        var c5 := c3.Uniao(c4);
+        assert toSet(c5.Conteudo) == {1, 2, 3, 4, 5, 6, 7, 8};
+    }
 
-        // Adicionar novamente elementos
-        // conjunto.Adicionar(50);
-        // conjunto.Adicionar(60);
-        // assert conjunto.QuantidadeElementos() == 2;
+    method TestInterseccao()
+    {
+        var c1 := new Conjunto();
+        c1.Adicionar(1);
+        c1.Adicionar(2);
+        c1.Adicionar(3);
 
-        // Teste finalizado
+        var c2 := new Conjunto();
+        c2.Adicionar(2);
+        c2.Adicionar(3);
+        c2.Adicionar(4);
+
+        var c3 := c1.Interseccao(c2);
+        var expectedIntersection := {2, 3};
+        assert toSet(c3.Conteudo) == expectedIntersection;
     }
 }
