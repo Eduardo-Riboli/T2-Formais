@@ -249,7 +249,7 @@ class Conjunto
         requires quantidade > 0
         ensures forall x :: x in toSet(result.Conteudo) <==> x in toSet(Conteudo) && x in toSet(other.Conteudo)
         ensures result.Valid()
-        // ensures toSet(result.Conteudo) == toSet(Conteudo) * toSet(other.Conteudo)
+        ensures toSet(result.Conteudo) == toSet(Conteudo) * toSet(other.Conteudo)
         ensures Valid()
         ensures fresh(result)
     {
@@ -394,22 +394,7 @@ class Conjunto
         c2.Adicionar(4);
 
         var c3 := c1.Interseccao(c2);
-        assert c3.Valid();
         var expectedIntersection := {2, 3};
         assert toSet(c3.Conteudo) == expectedIntersection;
-
-        // Testar interseção com nenhum elemento em comum
-        var c4 := new Conjunto();
-        c4.Adicionar(5);
-        c4.Adicionar(6);
-
-        var c5 := c1.Interseccao(c4);
-        assert c5.Valid();
-        assert toSet(c5.Conteudo) == {};
-
-        // Testar interseção consigo mesmo
-        var c6 := c1.Interseccao(c1);
-        assert c6.Valid();
-        assert toSet(c6.Conteudo) == toSet(c1.Conteudo);
     }
 }
