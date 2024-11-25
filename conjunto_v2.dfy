@@ -115,6 +115,79 @@ class Conjunto
         vazio := quantidade == 0;
     }
 
+    method Remover(elemento: int) returns (removido:bool)
+        requires Valid()
+        requires |Conteudo| > 0
+        modifies this, elementos
+        requires elemento in Conteudo
+        ensures removido ==> forall x :: x in Conteudo <==> x in old(Conteudo) && x != elemento
+
+    {
+        removido := false;
+        // Encontrar a posição do elemento no array
+        ghost var ConteudoInicial := old(Conteudo);
+        assert Conteudo == ConteudoInicial;
+
+        var indice := -1;
+            for i := 0 to quantidade - 1
+            invariant 0 <= i <= quantidade
+            invariant Valid()
+            invariant Conteudo == ConteudoInicial
+            invariant forall j :: 0 <= j < i ==> elementos[j] != elemento
+            invariant (indice == -1 ==> forall j :: 0 <= j < i ==> elementos[j] != elemento) // Antes de encontrar o elemento
+            invariant (indice != -1 ==> (0 <= indice < quantidade && elementos[indice] == elemento)) // Depois de encontrar o elemento
+            invariant exists k :: 0 <= k < quantidade && elementos[k] == elemento // Garante que o elemento existe
+        {
+            if elementos[i] == elemento {
+                assert i != -1;
+                indice := i;
+                assert i == indice;
+                assert indice != -1;
+                break;
+            }
+        }
+
+        if indice == -1 
+        {
+            assert Conteudo == ConteudoInicial;
+            return;
+        }
+
+        assert indice != -1; // Ensure we found the element
+
+        Conteudo := Conteudo[0..indice] + Conteudo[indice + 1..];
+        assert Conteudo == old(Conteudo)[0..indice] + old(Conteudo)[indice + 1..];
+
+        // Shift elements in the array
+        forall i | indice <= i < quantidade - 1 {
+            elementos[i] := elementos[i + 1];
+        }
+
+        // Update quantity
+        quantidade := quantidade - 1;
+
+        // Reduz tamanho do array, se necessário
+        if quantidade < elementos.Length / 4 && elementos.Length > 10 {
+            var novoTamanho := elementos.Length / 2;
+            var novoArray := new int[novoTamanho];
+
+            forall i | 0 <= i < quantidade {
+                novoArray[i] := elementos[i];
+            }
+
+            var old_elementos := elementos;
+            elementos := novoArray;
+        }
+            // assert Valid();
+            // Atualiza o conjunto
+            var old_elementos := elementos;
+
+            removido := true;
+
+            // Garante que o conjunto continua válido
+            // assert Valid();
+    }
+
     method Uniao(other: Conjunto) returns (result: Conjunto)
         requires Valid()
         requires other.Valid()
