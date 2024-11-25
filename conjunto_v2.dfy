@@ -41,7 +41,6 @@ class Conjunto
         ensures Valid()
         ensures possui_elemento(elemento)
         ensures exists i :: 0 <= i < quantidade && elementos[i] == elemento
-        ensures Conteudo == old(Conteudo) || Conteudo == old(Conteudo) + [elemento]
         ensures forall i :: i in old(Conteudo) ==> i in Conteudo
         ensures forall i, j :: 0 <= i < j < quantidade ==> elementos[i] != elementos[j]
         ensures old(!possui_elemento(elemento)) <==> Conteudo == old(Conteudo) + [elemento]
@@ -56,25 +55,25 @@ class Conjunto
             return;
         }
 
-        var novoArranjo := new int[elementos.Length + 1];
+        var novoElementos := new int[elementos.Length + 1];
         var i := 0;
 
         while i < elementos.Length
             invariant 0 <= i <= elementos.Length
-            invariant novoArranjo.Length == elementos.Length + 1
-            invariant forall k :: 0 <= k < i ==> novoArranjo[k] == elementos[k]
+            invariant novoElementos.Length == elementos.Length + 1
+            invariant forall k :: 0 <= k < i ==> novoElementos[k] == elementos[k]
             invariant Conteudo == old(Conteudo)
             invariant Valid()
             invariant forall j :: 0 <= j < elementos.Length ==> elementos[j] == Conteudo[j]
         {
-            novoArranjo[i] := elementos[i];
+            novoElementos[i] := elementos[i];
             i := i + 1;
         }
 
-        novoArranjo[elementos.Length] := elemento;
-        Conteudo := Conteudo + [elemento];
+        novoElementos[elementos.Length] := elemento;
         quantidade := quantidade + 1;
-        elementos := novoArranjo;
+        elementos := novoElementos;
+        Conteudo := Conteudo + [elemento];
     }
 
     method Contem(elemento: int) returns (existe: bool)
@@ -236,7 +235,8 @@ class Conjunto
         tamanho := c1.QuantidadeElementos();
         assert tamanho == 3;
 
-        c1.Adicionar(2); // Tentando adicionar elemento duplicado
+        c1.Adicionar(1); // Tentando adicionar elemento duplicado
+        assert c1.Valid();
         tamanho := c1.QuantidadeElementos();
         assert tamanho == 3; // Quantidade deve permanecer 3
     }
