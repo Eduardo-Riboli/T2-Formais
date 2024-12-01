@@ -1,9 +1,10 @@
 class Conjunto
 {
     ghost var Conteudo: seq<int>
+    // ghost var Conteudo é um conjunto que representa o conteúdo do conjunto, utilizado para facilitar a verificação de propriedades
 
-    var elementos: array<int>
-    var quantidade: nat
+    var elementos: array<int> // Array de elementos do conjunto
+    var quantidade: nat // Quantidade de elementos no conjunto
 
     ghost predicate Valid()
         reads this, elementos
@@ -24,7 +25,7 @@ class Conjunto
         reads this, elementos
     {
         exists i :: 0 <= i < elementos.Length && elementos[i] == e
-    }
+    } 
 
     constructor()
         ensures Valid()
@@ -35,23 +36,23 @@ class Conjunto
         Conteudo := [];
     }
 
-    method Adicionar(elemento: int)
+    method Adicionar(elemento: int) // não retorna nada ? nem true nem false
         requires Valid()
         modifies this
-        ensures Valid()
-        ensures exists i :: 0 <= i < quantidade && elementos[i] == elemento
-        ensures forall i :: i in old(Conteudo) ==> i in Conteudo
-        ensures forall i, j :: 0 <= i < j < quantidade ==> elementos[i] != elementos[j]
-        ensures old(!possui_elemento(elemento)) <==> Conteudo == old(Conteudo) + [elemento]
-        ensures old(!possui_elemento(elemento)) <==> quantidade == old(quantidade) + 1
-        ensures old(possui_elemento(elemento)) <==> Conteudo == old(Conteudo)
-        ensures old(possui_elemento(elemento)) <==> quantidade == old(quantidade)
+        ensures Valid() 
+        ensures exists i :: 0 <= i < quantidade && elementos[i] == elemento 
+        ensures forall i :: i in old(Conteudo) ==> i in Conteudo 
+        ensures forall i, j :: 0 <= i < j < quantidade ==> elementos[i] != elementos[j] // não é redundante uma vez que a pós-condição de validade já garante isso ?
+        ensures old(!possui_elemento(elemento)) <==> Conteudo == old(Conteudo) + [elemento] // 
+        ensures old(!possui_elemento(elemento)) <==> quantidade == old(quantidade) + 1 // se o conjunto é igual, o tamanho é igual, desnecessário
+        ensures old(possui_elemento(elemento)) <==> Conteudo == old(Conteudo) // 
+        ensures old(possui_elemento(elemento)) <==> quantidade == old(quantidade) // mesma coisa, desnecessário
         ensures elemento in Conteudo
     {
         if possui_elemento(elemento) {
             // Garante que nada mudou quando o elemento já existe
             assert Conteudo == old(Conteudo);
-            assert quantidade == old(quantidade);
+            assert quantidade == old(quantidade); // redundante validar igualdade de conteúdo e quantidade
             return;
         }
 
@@ -68,11 +69,15 @@ class Conjunto
             novoElementos[i] := elementos[i];
             i := i + 1;
         }
+        
 
         novoElementos[elementos.Length] := elemento;
         quantidade := quantidade + 1;
         elementos := novoElementos;
         Conteudo := Conteudo + [elemento];
+
+        assert Conteudo == old(Conteudo) + [elemento];
+
     }
 
     method Contem(elemento: int) returns (existe: bool)
@@ -115,77 +120,105 @@ class Conjunto
         vazio := quantidade == 0;
     }
 
-    method Remover(elemento: int) returns (removido:bool)
+    method obterIndice(elemento:int) returns (indice:int)
+        // reads this, elementos
         requires Valid()
-        requires |Conteudo| > 0
-        modifies this, elementos
-        requires elemento in Conteudo
-        ensures removido ==> forall x :: x in Conteudo <==> x in old(Conteudo) && x != elemento
+        ensures Valid()
+        ensures -1 <= indice < elementos.Length
+        ensures indice != -1 <==> possui_elemento(elemento)
+        ensures indice == -1 ==> !possui_elemento(elemento)
+        ensures indice != -1 ==> elementos[indice] == elemento
+        {
+            // if !possui_elemento(elemento) {
+            //     indice := -1;
+            //     return;
+            // }
 
+            var index := -1;
+            var i:=0;
+
+            while i < elementos.Length
+                invariant 0 <= i <= elementos.Length
+                invariant index == -1 ==> forall j :: 0 <= j < i ==> elementos[j] != elemento
+                invariant index != -1 ==> 0 <= index < elementos.Length && elementos[index] == elemento
+                decreases elementos.Length - i
+                invariant Valid()
+                invariant forall j :: 0 <= j < i ==> elementos[j] != elemento
+            {
+                if elementos[i] == elemento {
+                    index := i;
+                    break;
+                }
+                i := i + 1;
+            }
+
+            indice := index;
+            assert indice == index;
+            assert indice == -1 ==> !possui_elemento(elemento);
+            assert indice != -1 ==> possui_elemento(elemento);
+            assert Valid();
+            
+        }
+
+
+    method Remover(elemento: int) returns (removido:bool)
+        requires Valid() // OK
+        // requires |Conteudo| > 0 // OK
+        // modifies novosElementos, elementos // OK
+        // requires elemento in Conteudo // OK
+        modifies this
+        ensures Valid()
+
+        // ensures possui_elemento(old(elemento)) ==> !possui_elemento(elemento)
+        // ensures removido ==> forall x :: x in Conteudo <==> x in old(Conteudo) && x != elemento
     {
         removido := false;
-        // Encontrar a posição do elemento no array
+
         ghost var ConteudoInicial := old(Conteudo);
         assert Conteudo == ConteudoInicial;
 
-        var indice := -1;
-            for i := 0 to quantidade - 1
-            invariant 0 <= i <= quantidade
-            invariant Valid()
-            invariant Conteudo == ConteudoInicial
-            invariant forall j :: 0 <= j < i ==> elementos[j] != elemento
-            invariant (indice == -1 ==> forall j :: 0 <= j < i ==> elementos[j] != elemento) // Antes de encontrar o elemento
-            invariant (indice != -1 ==> (0 <= indice < quantidade && elementos[indice] == elemento)) // Depois de encontrar o elemento
-            invariant exists k :: 0 <= k < quantidade && elementos[k] == elemento // Garante que o elemento existe
-        {
-            if elementos[i] == elemento {
-                assert i != -1;
-                indice := i;
-                assert i == indice;
-                assert indice != -1;
-                break;
-            }
-        }
+        var indiceParaRemover := obterIndice(elemento);
 
-        if indice == -1 
+        if indiceParaRemover == -1 
         {
             assert Conteudo == ConteudoInicial;
             return;
         }
 
-        assert indice != -1; // Ensure we found the element
+        var novosElementos := new int[elementos.Length - 1];
+        var indexAtual := 0;
+        var indexCopia := 0;
+        
+        while indexAtual < quantidade
+            modifies novosElementos
+            decreases quantidade - indexAtual
+            invariant Valid()
+            // invariant elementos.Length == novosElementos.Length - 1
+            invariant indexAtual <= quantidade
+            invariant indexCopia <= novosElementos.Length
+            invariant indiceParaRemover != -1
+            invariant indiceParaRemover < elementos.Length
+            invariant novosElementos.Length == elementos.Length - 1
+            invariant indexCopia < novosElementos.Length
 
-        Conteudo := Conteudo[0..indice] + Conteudo[indice + 1..];
-        assert Conteudo == old(Conteudo)[0..indice] + old(Conteudo)[indice + 1..];
-
-        // Shift elements in the array
-        forall i | indice <= i < quantidade - 1 {
-            elementos[i] := elementos[i + 1];
-        }
-
-        // Update quantity
-        quantidade := quantidade - 1;
-
-        // Reduz tamanho do array, se necessário
-        if quantidade < elementos.Length / 4 && elementos.Length > 10 {
-            var novoTamanho := elementos.Length / 2;
-            var novoArray := new int[novoTamanho];
-
-            forall i | 0 <= i < quantidade {
-                novoArray[i] := elementos[i];
+            // invariant indexCopia <= indexAtual
+            {
+                if indiceParaRemover != indexAtual {
+                    novosElementos[indexCopia] := elementos[indexAtual];
+                    indexCopia := indexCopia + 1;
+                }
+                indexAtual := indexAtual + 1;
+                
             }
-
-            var old_elementos := elementos;
-            elementos := novoArray;
-        }
-            // assert Valid();
-            // Atualiza o conjunto
-            var old_elementos := elementos;
-
-            removido := true;
-
-            // Garante que o conjunto continua válido
-            // assert Valid();
+        removido := true;
+        elementos := novosElementos;   
+        assert Valid();  
+        // quantidade := quantidade - 1;   
+        assert Valid();    
+         
+        Conteudo := Conteudo[0..indiceParaRemover] + Conteudo[indiceParaRemover+1..];
+        assert Valid();   
+        // assert Valid();        
     }
 
     method Uniao(other: Conjunto) returns (result: Conjunto)
@@ -304,6 +337,29 @@ class Conjunto
         assert toSet(c2.Conteudo) == {4, 5, 6};
     }
 
+    method TestRemover() {
+        var c1 := new Conjunto();
+        c1.Adicionar(1);
+        c1.Adicionar(2);
+        assert c1.Valid();
+        assert c1.Conteudo == [1, 2];
+        var index := c1.obterIndice(1);
+        assert c1.Valid();
+        var temOuNao := c1.Contem(1);
+        assert temOuNao == true;
+        var posicao := c1.obterIndice(1);
+        assert posicao != -1;
+        assert posicao == 0;
+        assert toSet(c1.Conteudo) == {1, 2};
+        
+
+        
+
+        var removido := c1.Remover(1);
+        assert c1.Valid();
+        // assert c1.Conteudo == [2];
+    }
+
     method TestContem()
     {
         var c1 := new Conjunto();
@@ -393,3 +449,5 @@ class Conjunto
         assert toSet(c3.Conteudo) == expectedIntersection;
     }
 }
+
+// v
