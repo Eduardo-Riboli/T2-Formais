@@ -44,7 +44,7 @@ class Conjunto
         ensures forall i :: i in old(Conteudo) ==> i in Conteudo 
         ensures forall i, j :: 0 <= i < j < quantidade ==> elementos[i] != elementos[j] // não é redundante uma vez que a pós-condição de validade já garante isso ?
         ensures old(!possui_elemento(elemento)) <==> Conteudo == old(Conteudo) + [elemento] // 
-        ensures old(!possui_elemento(elemento)) <==> quantidade == old(quantidade) + 1 // se o conjunto é igual, o tamanho é igual, desnecessário
+        ensures old(!possui_elemento(elemento)) <==> quantidade == old(quantidade) + 1 // o conjunto é igual, o tamanho é igual, desnecessário
         ensures old(possui_elemento(elemento)) <==> Conteudo == old(Conteudo) // 
         ensures old(possui_elemento(elemento)) <==> quantidade == old(quantidade) // mesma coisa, desnecessário
         ensures elemento in Conteudo
@@ -168,7 +168,16 @@ class Conjunto
         // requires elemento in Conteudo // OK
         modifies this
         ensures Valid()
-
+        ensures elemento in old(Conteudo) ==> elemento !in Conteudo // OK
+        ensures old(possui_elemento(elemento)) ==> !possui_elemento(elemento) // OK
+        ensures possui_elemento(elemento) ==> |Conteudo| == |old(Conteudo)| - 1 // OK
+        // ensures !possui_elemento(elemento) ==> |Conteudo| == |old(Conteudo)| // OK
+        ensures old (!possui_elemento(elemento)) ==> Conteudo == old(Conteudo) // OK
+        ensures old (!possui_elemento(elemento)) ==> quantidade == old(quantidade) // OK
+        ensures old (possui_elemento(elemento)) ==> quantidade == old(quantidade) - 1 // OK
+        
+        // ensures old(quantidade) == quantidade - 1
+        // ensures old(possui_elemento(elemento)) ==> Conteudo == old(Conteudo[0..indiceParaRemover] + Conteudo[indiceParaRemover+1..]) // OK
         // ensures possui_elemento(old(elemento)) ==> !possui_elemento(elemento)
         // ensures removido ==> forall x :: x in Conteudo <==> x in old(Conteudo) && x != elemento
     {
@@ -189,36 +198,44 @@ class Conjunto
         var indexAtual := 0;
         var indexCopia := 0;
         
-        while indexAtual < quantidade
+        while indexAtual < quantidade && indexCopia < novosElementos.Length
             modifies novosElementos
             decreases quantidade - indexAtual
             invariant Valid()
             // invariant elementos.Length == novosElementos.Length - 1
+            // invariant !removido ==> Conteudo == ConteudoInicial
             invariant indexAtual <= quantidade
             invariant indexCopia <= novosElementos.Length
             invariant indiceParaRemover != -1
             invariant indiceParaRemover < elementos.Length
             invariant novosElementos.Length == elementos.Length - 1
-            invariant indexCopia < novosElementos.Length
-
-            // invariant indexCopia <= indexAtual
+            invariant indexCopia <= novosElementos.Length
+            invariant Conteudo == ConteudoInicial
+            // invariant indexCopia < novosElementos.Length
+            // invariant forall i :: 0 <= i < indiceParaRemover ==> indexCopia == indexAtual
             {
                 if indiceParaRemover != indexAtual {
                     novosElementos[indexCopia] := elementos[indexAtual];
                     indexCopia := indexCopia + 1;
                 }
                 indexAtual := indexAtual + 1;
-                
+                assert Valid(); 
             }
+
         removido := true;
-        elementos := novosElementos;   
-        assert Valid();  
-        // quantidade := quantidade - 1;   
-        assert Valid();    
-         
+        assert Valid(); 
+        assert Conteudo == elementos[0..quantidade];
+
+        quantidade := quantidade - 1; 
+        assert quantidade == old(quantidade) - 1;
+        assert forall i :: 0 <= i < quantidade && old(elementos[i]) != elemento ==> elemento in Conteudo;
+
+        elementos := novosElementos;
+        
         Conteudo := Conteudo[0..indiceParaRemover] + Conteudo[indiceParaRemover+1..];
-        assert Valid();   
-        // assert Valid();        
+
+        // assert Conteudo == elementos[0..quantidade];
+        assert Valid();      
     }
 
     method Uniao(other: Conjunto) returns (result: Conjunto)
