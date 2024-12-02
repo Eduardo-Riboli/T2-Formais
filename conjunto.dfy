@@ -1,3 +1,10 @@
+// Nomes:
+// Eduardo Riboli
+// Jocemar Nicolodi
+// Eduardo Pretto
+// Filipe Serafini
+// Joao Pedro Feijó
+
 class Conjunto
 {
     // ghost var Conteudo é um conjunto que representa o conteúdo do conjunto, utilizado para facilitar a verificação de propriedades
@@ -301,7 +308,7 @@ class Conjunto
         }
     }
 
-    // Métodos com todos os testes
+    // Métodos com todos os testes unitários
     method TestAdicionar()
     {
         var c1 := new Conjunto();
