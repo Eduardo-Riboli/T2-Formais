@@ -170,6 +170,7 @@ class Conjunto
             assert Valid();
         }
 
+    // Remover um elemento do conjunto
     method Remover(elemento: int)
         requires Valid()
         modifies this
@@ -197,6 +198,7 @@ class Conjunto
 
         var novoElementos := new int[novoTamanhoLength];
         var k := 0;
+
         while k < novoTamanhoLength
             invariant 0 <= k <= novoTamanhoLength
             invariant forall i :: 0 <= i < k ==> novoElementos[i] == novoConteudo[i]
