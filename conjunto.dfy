@@ -1,11 +1,14 @@
 class Conjunto
 {
-    ghost var Conteudo: seq<int>
     // ghost var Conteudo é um conjunto que representa o conteúdo do conjunto, utilizado para facilitar a verificação de propriedades
+    ghost var Conteudo: seq<int>
 
-    var elementos: array<int> // Array de elementos do conjunto
-    var quantidade: nat // Quantidade de elementos no conjunto
+    // Array de elementos do conjunto
+    var elementos: array<int> 
+    // Quantidade de elementos no conjunto
+    var quantidade: nat 
 
+    // Valid() que valida a cada iteração do loop ou ver que é valido o conjunto
     ghost predicate Valid()
         reads this, elementos
     {
@@ -21,12 +24,23 @@ class Conjunto
         set x | x in s
     }
 
+    // Verifica se o elemento está no conjunto
     function possui_elemento(e: int): bool
         reads this, elementos
     {
         exists i :: 0 <= i < elementos.Length && elementos[i] == e
-    } 
+    }
 
+    lemma ConcatenandoDuasSequenciasUnicas(s1: seq<int>, s2: seq<int>)
+        requires (forall i, j :: 0 <= i < |s1| && 0 <= j < |s1| && i != j ==> s1[i] != s1[j])
+        requires (forall i, j :: 0 <= i < |s2| && 0 <= j < |s2| && i != j ==> s2[i] != s2[j])
+        requires (forall i :: 0 <= i < |s1| ==> (forall j :: 0 <= j < |s2| ==> s1[i] != s2[j]))
+        ensures (forall i, j :: 0 <= i < |s1 + s2| && 0 <= j < |s1 + s2| && i != j ==> (s1 + s2)[i] != (s1 + s2)[j])
+    {
+        // dafny consegue explicitamente resolver isso, serve mesmo para provar que as duas sequencias sao unicas
+    }
+
+    // Construtor do conjunto
     constructor()
         ensures Valid()
         ensures Conteudo == []
@@ -36,23 +50,24 @@ class Conjunto
         Conteudo := [];
     }
 
-    method Adicionar(elemento: int) // não retorna nada ? nem true nem false
+    // Adicionar um elemento ao conjunto
+    method Adicionar(elemento: int)
         requires Valid()
         modifies this
         ensures Valid() 
         ensures exists i :: 0 <= i < quantidade && elementos[i] == elemento 
         ensures forall i :: i in old(Conteudo) ==> i in Conteudo 
-        ensures forall i, j :: 0 <= i < j < quantidade ==> elementos[i] != elementos[j] // não é redundante uma vez que a pós-condição de validade já garante isso ?
-        ensures old(!possui_elemento(elemento)) <==> Conteudo == old(Conteudo) + [elemento] // 
-        ensures old(!possui_elemento(elemento)) <==> quantidade == old(quantidade) + 1 // o conjunto é igual, o tamanho é igual, desnecessário
-        ensures old(possui_elemento(elemento)) <==> Conteudo == old(Conteudo) // 
-        ensures old(possui_elemento(elemento)) <==> quantidade == old(quantidade) // mesma coisa, desnecessário
+        ensures forall i, j :: 0 <= i < j < quantidade ==> elementos[i] != elementos[j]
+        ensures old(!possui_elemento(elemento)) <==> Conteudo == old(Conteudo) + [elemento]
+        ensures old(!possui_elemento(elemento)) <==> quantidade == old(quantidade) + 1
+        ensures old(possui_elemento(elemento)) <==> Conteudo == old(Conteudo) 
+        ensures old(possui_elemento(elemento)) <==> quantidade == old(quantidade)
         ensures elemento in Conteudo
     {
         if possui_elemento(elemento) {
             // Garante que nada mudou quando o elemento já existe
             assert Conteudo == old(Conteudo);
-            assert quantidade == old(quantidade); // redundante validar igualdade de conteúdo e quantidade
+            assert quantidade == old(quantidade);
             return;
         }
 
@@ -69,7 +84,6 @@ class Conjunto
             novoElementos[i] := elementos[i];
             i := i + 1;
         }
-        
 
         novoElementos[elementos.Length] := elemento;
         quantidade := quantidade + 1;
@@ -77,9 +91,9 @@ class Conjunto
         Conteudo := Conteudo + [elemento];
 
         assert Conteudo == old(Conteudo) + [elemento];
-
     }
 
+    // Verificar se o conjunto contém um determinado elemento
     method Contem(elemento: int) returns (existe: bool)
         requires Valid()
         ensures Valid()
@@ -104,6 +118,7 @@ class Conjunto
         }
     }
 
+    // Verificar a quantidade de elementos do conjunto
     method QuantidadeElementos() returns (tamanho: nat)
         requires Valid()
         ensures tamanho == |Conteudo|
@@ -112,6 +127,7 @@ class Conjunto
         tamanho := quantidade;
     }
 
+    // verificar se o conjunto é vazio
     method EhVazio() returns (vazio: bool)
         requires Valid()
         ensures vazio == (quantidade == 0)
@@ -120,28 +136,23 @@ class Conjunto
         vazio := quantidade == 0;
     }
 
+    // obter o indice de um elemento
     method obterIndice(elemento:int) returns (indice:int)
-        // reads this, elementos
         requires Valid()
         ensures Valid()
-        ensures -1 <= indice < elementos.Length
-        ensures indice != -1 <==> possui_elemento(elemento)
-        ensures indice == -1 ==> !possui_elemento(elemento)
+        ensures -1 <= indice < quantidade
+        ensures indice != -1 <==> elemento in Conteudo
+        ensures indice == -1 ==> elemento !in Conteudo
         ensures indice != -1 ==> elementos[indice] == elemento
         {
-            // if !possui_elemento(elemento) {
-            //     indice := -1;
-            //     return;
-            // }
-
             var index := -1;
             var i:=0;
 
-            while i < elementos.Length
-                invariant 0 <= i <= elementos.Length
+            while i < quantidade
+                invariant 0 <= i <= quantidade
                 invariant index == -1 ==> forall j :: 0 <= j < i ==> elementos[j] != elemento
-                invariant index != -1 ==> 0 <= index < elementos.Length && elementos[index] == elemento
-                decreases elementos.Length - i
+                invariant index != -1 ==> 0 <= index < quantidade && elementos[index] == elemento
+                decreases quantidade - i
                 invariant Valid()
                 invariant forall j :: 0 <= j < i ==> elementos[j] != elemento
             {
@@ -157,87 +168,49 @@ class Conjunto
             assert indice == -1 ==> !possui_elemento(elemento);
             assert indice != -1 ==> possui_elemento(elemento);
             assert Valid();
-            
         }
 
-
-    method Remover(elemento: int) returns (removido:bool)
-        requires Valid() // OK
-        // requires |Conteudo| > 0 // OK
-        // modifies novosElementos, elementos // OK
-        // requires elemento in Conteudo // OK
+    method Remover(elemento: int)
+        requires Valid()
         modifies this
         ensures Valid()
-        ensures elemento in old(Conteudo) ==> elemento !in Conteudo // OK
-        ensures old(possui_elemento(elemento)) ==> !possui_elemento(elemento) // OK
-        ensures possui_elemento(elemento) ==> |Conteudo| == |old(Conteudo)| - 1 // OK
-        // ensures !possui_elemento(elemento) ==> |Conteudo| == |old(Conteudo)| // OK
-        ensures old (!possui_elemento(elemento)) ==> Conteudo == old(Conteudo) // OK
-        ensures old (!possui_elemento(elemento)) ==> quantidade == old(quantidade) // OK
-        ensures old (possui_elemento(elemento)) ==> quantidade == old(quantidade) - 1 // OK
-        
-        // ensures old(quantidade) == quantidade - 1
-        // ensures old(possui_elemento(elemento)) ==> Conteudo == old(Conteudo[0..indiceParaRemover] + Conteudo[indiceParaRemover+1..]) // OK
-        // ensures possui_elemento(old(elemento)) ==> !possui_elemento(elemento)
-        // ensures removido ==> forall x :: x in Conteudo <==> x in old(Conteudo) && x != elemento
+        ensures old(possui_elemento(elemento)) ==> quantidade == old(quantidade) - 1
+        ensures old(possui_elemento(elemento)) ==> !possui_elemento(elemento)
+        ensures forall i :: i in old(Conteudo) && i != elemento ==> i in Conteudo
+        ensures forall i :: i !in old(Conteudo) ==> i !in Conteudo
     {
-        removido := false;
-
-        ghost var ConteudoInicial := old(Conteudo);
-        assert Conteudo == ConteudoInicial;
-
-        var indiceParaRemover := obterIndice(elemento);
-
-        if indiceParaRemover == -1 
-        {
-            assert Conteudo == ConteudoInicial;
+        if !possui_elemento(elemento) {
             return;
         }
 
-        var novosElementos := new int[elementos.Length - 1];
-        var indexAtual := 0;
-        var indexCopia := 0;
-        
-        while indexAtual < quantidade && indexCopia < novosElementos.Length
-            modifies novosElementos
-            decreases quantidade - indexAtual
-            invariant Valid()
-            // invariant elementos.Length == novosElementos.Length - 1
-            // invariant !removido ==> Conteudo == ConteudoInicial
-            invariant indexAtual <= quantidade
-            invariant indexCopia <= novosElementos.Length
-            invariant indiceParaRemover != -1
-            invariant indiceParaRemover < elementos.Length
-            invariant novosElementos.Length == elementos.Length - 1
-            invariant indexCopia <= novosElementos.Length
-            invariant Conteudo == ConteudoInicial
-            // invariant indexCopia < novosElementos.Length
-            // invariant forall i :: 0 <= i < indiceParaRemover ==> indexCopia == indexAtual
-            {
-                if indiceParaRemover != indexAtual {
-                    novosElementos[indexCopia] := elementos[indexAtual];
-                    indexCopia := indexCopia + 1;
-                }
-                indexAtual := indexAtual + 1;
-                assert Valid(); 
-            }
+        var indiceParaRemover := obterIndice(elemento);
+        assert indiceParaRemover != -1;
 
-        removido := true;
-        assert Valid(); 
-        assert Conteudo == elementos[0..quantidade];
+        var primeiraParte := elementos[0..indiceParaRemover];
+        var segundaParte := elementos[indiceParaRemover + 1..quantidade];
 
-        quantidade := quantidade - 1; 
-        assert quantidade == old(quantidade) - 1;
-        assert forall i :: 0 <= i < quantidade && old(elementos[i]) != elemento ==> elemento in Conteudo;
+        var novoConteudo := primeiraParte + segundaParte;
+        var novoTamanhoLength := |novoConteudo|;
 
-        elementos := novosElementos;
-        
-        Conteudo := Conteudo[0..indiceParaRemover] + Conteudo[indiceParaRemover+1..];
+        // Usando lema para provar que a concatenação de sequências únicas é única
+        ConcatenandoDuasSequenciasUnicas(primeiraParte, segundaParte);
 
-        // assert Conteudo == elementos[0..quantidade];
-        assert Valid();      
+        var novoElementos := new int[novoTamanhoLength];
+        var k := 0;
+        while k < novoTamanhoLength
+            invariant 0 <= k <= novoTamanhoLength
+            invariant forall i :: 0 <= i < k ==> novoElementos[i] == novoConteudo[i]
+        {
+            novoElementos[k] := novoConteudo[k];
+            k := k + 1;
+        }
+
+        elementos := novoElementos;
+        quantidade := novoTamanhoLength;
+        Conteudo := novoConteudo;
     }
 
+    // A união entre dois conjuntos
     method Uniao(other: Conjunto) returns (result: Conjunto)
         requires Valid()
         requires other.Valid()
@@ -289,6 +262,7 @@ class Conjunto
         }
     }
 
+    // A interseção entre dois conjuntos
     method Interseccao(other: Conjunto) returns (result: Conjunto)
         requires Valid()
         requires other.Valid()
@@ -325,16 +299,7 @@ class Conjunto
         }
     }
 
-    method Main()
-    {
-        TestAdicionar();
-        TestContem();
-        TestQuantidadeElementos();
-        TestEhVazio();
-        TestUniao();
-        TestInterseccao();
-    }
-
+    // Métodos com todos os testes
     method TestAdicionar()
     {
         var c1 := new Conjunto();
@@ -368,13 +333,14 @@ class Conjunto
         assert posicao != -1;
         assert posicao == 0;
         assert toSet(c1.Conteudo) == {1, 2};
-        
+        var posicao2 := c1.obterIndice(5);
+        assert posicao2 == -1;
+        var posicao3 := c1.obterIndice(2);
+        assert posicao3 == 1;
 
-        
-
-        var removido := c1.Remover(1);
+        c1.Remover(1);
         assert c1.Valid();
-        // assert c1.Conteudo == [2];
+        assert c1.Conteudo == [2];
     }
 
     method TestContem()
@@ -466,5 +432,3 @@ class Conjunto
         assert toSet(c3.Conteudo) == expectedIntersection;
     }
 }
-
-// v
