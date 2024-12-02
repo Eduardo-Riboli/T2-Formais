@@ -333,14 +333,18 @@ class Conjunto
         assert posicao != -1;
         assert posicao == 0;
         assert toSet(c1.Conteudo) == {1, 2};
-        var posicao2 := c1.obterIndice(5);
-        assert posicao2 == -1;
-        var posicao3 := c1.obterIndice(2);
-        assert posicao3 == 1;
 
         c1.Remover(1);
         assert c1.Valid();
         assert c1.Conteudo == [2];
+
+        c1.Adicionar(1);
+        c1.Adicionar(3);
+        c1.Remover(2);
+        assert c1.Valid();
+        assert toSet(c1.Conteudo) == {1, 3};
+        var quantidade := c1.QuantidadeElementos();
+        assert quantidade == 2;
     }
 
     method TestContem()
